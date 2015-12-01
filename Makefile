@@ -5,9 +5,9 @@ MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 CURRENT_DIR := $(notdir $(patsubst %/,%,$(dir $(MAKEFILE_DIR))))
 DIR=$(MAKEFILE_DIR)
 
-targets: bin/k8s-template
+targets=bin/k8s-template
 
-build: targets
+build: $(targets)
 
 all: 
 	@printf "\n--------------------------------\n"
@@ -24,7 +24,7 @@ all:
 bin/%: %.go 
 	@echo "Building via % rule for $@ from $<"
 
-	if go version|grep -q 1.4 ; then											\
+	@if go version|grep -q 1.4 ; then											\
 	    args="-s -w -X main.Build $$(date -u +%Y.%m.%d.%H.%M.%S.%:::z) -X main.Commit $$(git log --format=%hash-%aI -n1)";	\
 	fi;															\
 	if go version|grep -q 1.5 ; then											\
@@ -37,9 +37,9 @@ bin/%: %.go
 init: get save
 
 get: 
-	GO15VENDOREXPERIMENT=1 GOPATH=${GOPATH} $(GOPATH)/bin/godep get $(libdep)
+	@GO15VENDOREXPERIMENT=1 GOPATH=${GOPATH} $(GOPATH)/bin/godep get $(libdep)
 save:
-	GO15VENDOREXPERIMENT=1 GOPATH=${GOPATH} $(GOPATH)/bin/godep save
+	@GO15VENDOREXPERIMENT=1 GOPATH=${GOPATH} $(GOPATH)/bin/godep save
 clean:
 	@echo cleaning up temporary files
 	@echo rm -f $(targets)
