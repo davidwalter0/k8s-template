@@ -1,0 +1,18 @@
+{
+	"ImportPath": "github.com/davidwalter0/k8s-template",
+	"GoVersion": "go1.5.1",
+	"Deps": [
+		{
+			"ImportPath": "github.com/davidwalter0/logger",
+			"Rev": "0ba5a988075eb5e2ea061fa35ef1abd8e51a1db1"
+		},
+		{
+			"ImportPath": "github.com/davidwalter0/transform",
+			"Rev": "8be2ed78ff1fa197aaf0d3ce9b1a0a0788f59725"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
+		}
+	]
+}

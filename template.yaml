@@ -1,0 +1,78 @@
+# apiVersion: v1
+# kind: Namespace
+# metadata:
+#   name: default
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: publish-cluster-config
+  labels:
+    app: publish-cluster-config
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    app: publish-cluster-config
+    version: v1
+  template:
+    metadata:
+      labels:
+        app: publish-cluster-config
+        version: v1
+    spec:
+      containers:
+      - name: publish-cluster-config
+        env:
+        - name:  "SIMPLE_FILE_SERVER_PORT"
+          value: "80"
+        - name:  "SIMPLE_FILE_SERVER_PATH"
+          value: "/publish"
+        image: k8s-master-01:5000/k8s-simple-file-server:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: "publish"
+          mountPath: "/publish"
+      volumes:
+        - name: "publish"
+          secret:
+            secretName: publish-cluster-config-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: default
+  name: publish-cluster-config
+  labels:
+    app: publish-cluster-config
+spec:
+  selector:
+    app: publish-cluster-config
+  ports:
+  - port: 80
+    name: publish-cluster-config
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: default
+  name: publish-cluster-config-secret
+data:
+  path: {{ .Path }}
+  hostname: {{ .Hostname }}
+  id-rsa: {{ .PrivateKey | base64Encode }}
+  id-rsa.pub: {{ .PublicKey | base64Encode }}
+  slackurl: {{ .SlackUrl }}
+  kubeconfig: {{ .KubeConfig }}
+  deploy.yaml: {{ .YamlConfig | base64Encode }}
+  authorized-keys: {{ .PublicKey | base64Encode }}
+
+
+# local variables:
+# comment-start: "# "
+# mode: yaml
+# end:

@@ -1,0 +1,22 @@
+{
+  "apiVersion": "v0.1",
+  "kind": "test",
+  "spec": [
+    {
+      "name": "test-cmd",
+      "protocol": "tcp",
+      "request": {
+        "spec": {
+          "arg": [],
+          "env": {},
+          "url": "uri"
+        }
+      },
+      "response": {
+        "ack": {},
+        "nak": {},
+        "x": true
+      }
+    }
+  ]
+}

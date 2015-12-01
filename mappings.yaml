@@ -1,0 +1,87 @@
+# template.yaml
+# 
+# Describe source record replacement text information
+
+# A data struct exposed for text replacement using the golang template
+# process. You're responsible to ensure that the name field is uniq
+
+# An array of definitions for replacement items
+# Name: the map replacement name for the golang template format, 
+#    name: Repo 's value after interpolation would replace the template
+#         {{ .Repo }}
+# in a file
+# 
+
+# Trivial first pass, use a standardized template of keyword key/value
+# name/value pairs in a rule file.
+
+# Fields with base64: true have their values replaced by their base64
+# equivalent string
+
+# fields with a file: true attribute are sourced from the named file
+
+# fields with an env: true attribute are sourced from the named environment variable
+
+# If for some reason you need both a base64 version and a plain text
+# version of an attribute, you can apply the base64:false flag and use
+# the provided helper function to remap the value
+#  YamlConfig : base64: false
+
+# Then the plain text version can map via a direct:
+#  {{ .YamlConfig }}
+
+# and the helper function base64Encode can be used where needed
+#  {{ .YamlConfig | base64Encode }}
+
+
+- name: GitRepoList
+  base64: true
+  value: |
+    git@github.com:davidwalter0/k8s-simple-forward.git
+
+- name: SlackUrl
+  base64: true
+  value: http://SomeSlackUrl
+
+- name: YamlConfig
+  base64: false
+  file: true
+  value: deploy.yaml
+
+- name: Path
+  base64: false
+  env: true
+  value: PATH
+
+- name: PrivateKey
+  base64: false
+  file: true
+  value: ~/.ssh/id_rsa
+
+- name: PublicKey
+  base64: false
+  file: true
+  value: ~/.ssh/id_rsa.pub
+
+- name: KubeConfig
+  base64: true
+  value: |
+      apiVersion: v1
+      clusters:
+      - cluster:
+          insecure-skip-tls-verify: true
+          server: https://k8s-master-01:443
+        name: k8s
+      contexts:
+      - context:
+          cluster: k8s
+          user: cluster-admin
+        name: k8s
+      current-context: k8s
+      kind: Config
+      preferences: {}
+      users:
+      - name: cluster-admin
+        user:
+          password: CHANGE_PASSWORD
+          username: kube
