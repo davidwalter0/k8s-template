@@ -9,6 +9,7 @@ variables:
   secret_url:  "http://ci-secret-config/kubeconfig"
   deploy_yaml: "http://ci-secret-config/deploy.yaml"
   debug:       "0"
+  registry:    "k8s-docker-registry:5000"
 
 build-template:
   stage: build
