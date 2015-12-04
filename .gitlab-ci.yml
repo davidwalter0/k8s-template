@@ -16,14 +16,14 @@ build-template:
     - export GOPATH=/go
     - export PATH=${GOPATH}/bin:${PATH}
     - echo "${HOSTNAME}" $(pwd) $(date)
+    - step=build
     - ./build
     - rc=$?
-    - step=build
     - if (( debug )); then echo bin/slack-status --step=${step} --gitlab-host=${gitlab_host} --gitlab-port=${gitlab_port} --gitlab-user=${gitlab_user} --slack-url=${config_url} --rc=${?}; fi
     - bin/slack-status --step=${step} --gitlab-host=${gitlab_host} --gitlab-port=${gitlab_port} --gitlab-user=${gitlab_user} --slack-url=${config_url} --rc=${?}
+    - step=dockerize
     - ./dockerize
     - rc=$?
-    - step=dockerize
     - if (( debug )); then echo bin/slack-status --step=${step} --gitlab-host=${gitlab_host} --gitlab-port=${gitlab_port} --gitlab-user=${gitlab_user} --slack-url=${config_url} --rc=${?}; fi
     - bin/slack-status --step=${step} --gitlab-host=${gitlab_host} --gitlab-port=${gitlab_port} --gitlab-user=${gitlab_user} --slack-url=${config_url} --rc=${?}
   only:
