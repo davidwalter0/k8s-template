@@ -99,16 +99,16 @@ attachments:
   # pretext: |
   #   <http://${gitlab_host}:${gitlab_port}/${gitlab_user}/${short}/builds|${short} step: ${step} status: ${status}>
 EOF
-            # if (( debug )); then
-            #     echo "docker run --rm --interactive k8s-docker-registry:5000/yaml2json2yaml:latest /bin/yaml2json --compress < ${json}.yaml > ${json}"
-            # fi
-            # docker run --rm --interactive k8s-docker-registry:5000/yaml2json2yaml:latest /bin/yaml2json --compress < ${json}.yaml > ${json}
-
             if (( debug )); then
-                echo "bin/yaml2json --compress < ${json}.yaml > ${json}"
+                echo "docker run --rm --interactive k8s-docker-registry:5000/yaml2json2yaml:latest /bin/yaml2json --compress < ${json}.yaml > ${json}"
             fi
+            docker run --rm --interactive k8s-docker-registry:5000/yaml2json2yaml:latest /bin/yaml2json --compress < ${json}.yaml > ${json}
 
-            bin/yaml2json --compress < ${json}.yaml > ${json}
+            # if (( debug )); then
+            #     echo "bin/yaml2json --compress < ${json}.yaml > ${json}"
+            # fi
+
+            # bin/yaml2json --compress < ${json}.yaml > ${json}
 
             if (( debug )) ; then
                 echo "curl --silent ${url} -d@\"${json}\""
