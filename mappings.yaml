@@ -1,38 +1,11 @@
-# template.yaml
-# 
-# Describe source record replacement text information
+- name: LBName
+  value: lb
 
-# A data struct exposed for text replacement using the golang template
-# process. You're responsible to ensure that the name field is uniq
+- name: RegistryName
+  value: k8s-docker-registry
 
-# An array of definitions for replacement items
-# Name: the map replacement name for the golang template format, 
-#    name: Repo 's value after interpolation would replace the template
-#         {{ .Repo }}
-# in a file
-# 
-
-# Trivial first pass, use a standardized template of keyword key/value
-# name/value pairs in a rule file.
-
-# Fields with base64: true have their values replaced by their base64
-# equivalent string
-
-# fields with a file: true attribute are sourced from the named file
-
-# fields with an env: true attribute are sourced from the named environment variable
-
-# If for some reason you need both a base64 version and a plain text
-# version of an attribute, you can apply the base64:false flag and use
-# the provided helper function to remap the value
-#  YamlConfig : base64: false
-
-# Then the plain text version can map via a direct:
-#  {{ .YamlConfig }}
-
-# and the helper function base64Encode can be used where needed
-#  {{ .YamlConfig | base64Encode }}
-
+- name: Publish
+  value: publish
 
 - name: GitRepoList
   base64: true
@@ -52,6 +25,11 @@
   base64: false
   env: true
   value: PATH
+
+- name: Hostname
+  base64: false
+  env: true
+  value: HOSTNAME
 
 - name: PrivateKey
   base64: false

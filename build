@@ -1,0 +1,15 @@
+#!/bin/bash
+dir=$(dirname $(readlink -f ${0}))
+#name=${dir##*/}
+name=template
+cd ${dir}
+if go version|grep -q 1.4 ; then
+    args="-s -w -X main.Build $(date -u +%Y.%m.%d.%H.%M.%S.%:::z) -X main.Commit $(git log --format=%hash-%aI -n1)"
+fi
+if go version|grep -q 1.5 ; then
+    args="-s -w -X main.Build=$(date -u +%Y.%m.%d.%H.%M.%S.%:::z) -X main.Commit=$(git log --format=%hash-%aI -n1)"
+fi
+export GOPATH=${dir}/go
+CGO_ENABLED=0 go get --tags netgo -ldflags "${args}" 
+CGO_ENABLED=0 go build --tags netgo -ldflags "${args}" -o ${dir}/bin/${name} ${name}.go
+

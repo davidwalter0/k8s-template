@@ -1,0 +1,17 @@
+#!/bin/bash
+dir=$(dirname $(readlink -f ${0}))
+cd ${dir}
+name=${dir##*/}
+cat > Dockerfile <<EOF
+FROM alpine:3.2
+COPY bin/ /bin/
+EOF
+
+image=${name}:latest
+master=k8s-docker-registry
+target=${master}:5000/${image}
+if docker build --force-rm --rm --tag ${image} . ; then
+    printf "tag and push image ${image}\n"
+    docker tag -f ${image} ${target}
+    docker push ${target}
+fi

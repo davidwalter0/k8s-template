@@ -1,0 +1,33 @@
+stages:
+  - build
+  
+variables:
+  gitlab_user: "root"
+  gitlab_host: "128.107.15.211"
+  gitlab_port: "8888"
+  config_url:  "http://ci-secret-config/slack.url"
+  secret_url:  "http://ci-secret-config/kubeconfig"
+  deploy_yaml: "http://ci-secret-config/deploy.yaml"
+  debug:       "0"
+
+build-template:
+  stage: build
+  script: 
+    - export GOPATH=/go
+    - export PATH=${GOPATH}/bin:${PATH}
+    - echo "${HOSTNAME}" $(pwd) $(date)
+    - ./build
+    - rc=$?
+    - step=build
+    - if (( debug )); then echo bin/slack-status --step=${step} --gitlab-host=${gitlab_host} --gitlab-port=${gitlab_port} --gitlab-user=${gitlab_user} --slack-url=${config_url} --rc=${?}; fi
+    - bin/slack-status --step=${step} --gitlab-host=${gitlab_host} --gitlab-port=${gitlab_port} --gitlab-user=${gitlab_user} --slack-url=${config_url} --rc=${?}
+    - ./dockerize
+    - rc=$?
+    - step=dockerize
+    - if (( debug )); then echo bin/slack-status --step=${step} --gitlab-host=${gitlab_host} --gitlab-port=${gitlab_port} --gitlab-user=${gitlab_user} --slack-url=${config_url} --rc=${?}; fi
+    - bin/slack-status --step=${step} --gitlab-host=${gitlab_host} --gitlab-port=${gitlab_port} --gitlab-user=${gitlab_user} --slack-url=${config_url} --rc=${?}
+  only:
+    - master
+  tags:
+    - shell
+    - ssh

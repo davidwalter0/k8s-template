@@ -6,61 +6,98 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: publish-cluster-config
+  name: {{ .Publish }}-cfg
   labels:
-    app: publish-cluster-config
+    app: {{ .Publish }}-cfg
     version: v1
 spec:
   replicas: 1
   selector:
-    app: publish-cluster-config
+    app: {{ .Publish }}-cfg
     version: v1
   template:
     metadata:
       labels:
-        app: publish-cluster-config
+        app: {{ .Publish }}-cfg
         version: v1
     spec:
       containers:
-      - name: publish-cluster-config
+      - name: {{ .Publish }}-cfg
         env:
         - name:  "SIMPLE_FILE_SERVER_PORT"
           value: "80"
         - name:  "SIMPLE_FILE_SERVER_PATH"
-          value: "/publish"
-        image: k8s-master-01:5000/k8s-simple-file-server:latest
+          value: "/{{ .Publish }}"
+        image: k8s-docker-registry:5000/k8s-simple-file-server:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
+          hostPort: 8088
         volumeMounts:
-        - name: "publish"
-          mountPath: "/publish"
+        - name: "{{ .Publish }}"
+          mountPath: "/{{ .Publish }}"
       volumes:
-        - name: "publish"
+        - name: "{{ .Publish }}"
           secret:
-            secretName: publish-cluster-config-secret
+            secretName: {{ .Publish }}-cfg-secret
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   namespace: default
-  name: publish-cluster-config
+  name: {{ .Publish }}-cfg
   labels:
-    app: publish-cluster-config
+    app: {{ .Publish }}-cfg
 spec:
   selector:
-    app: publish-cluster-config
+    app: {{ .Publish }}-cfg
   ports:
   - port: 80
-    name: publish-cluster-config
+    name: {{ .Publish }}-cfg
+
+---
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: {{ .LBName }}-{{ .Publish }}
+  labels:
+    app: {{ .LBName }}-{{ .Publish }}
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    app: {{ .LBName }}-{{ .Publish }}
+    version: v1
+  template:
+    metadata:
+      labels:
+        app: {{ .LBName }}-{{ .Publish }}
+        version: v1
+    spec:
+      nodeSelector:
+        role: loadbalancer
+      containers:
+      - image: {{ .RegistryName }}:5000/k8s-simple-forward
+        imagePullPolicy: IfNotPresent
+        name: k8s-simple-forward
+        ports:
+        # All http services
+        - containerPort: 8080
+          hostPort: 8443
+          protocol: TCP
+        resources: {}
+        args:
+        - /k8s-simple-forward
+        - 0.0.0.0:8080
+        - {{ .Publish }}-cfg:8080
 
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   namespace: default
-  name: publish-cluster-config-secret
+  name: {{ .Publish }}-cfg-secret
 data:
   path: {{ .Path }}
   hostname: {{ .Hostname }}

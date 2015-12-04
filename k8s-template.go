@@ -50,7 +50,7 @@ import (
 
 var TemplateFile = flag.String("template", "", "file with templates to replace")
 var MappingsFile = flag.String("mappings", "mappings.yaml", "describe the replacement values")
-var Version = flag.Bool("version", false, "print build and git commit as a version string")
+var version = flag.Bool("version", false, "print build and git commit as a version string")
 var debug = flag.Bool("debug", false, "dump additional debugging information on template apply failure")
 
 var TemplateText []byte
