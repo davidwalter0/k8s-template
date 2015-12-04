@@ -1,4 +1,7 @@
 ### k8s-template
+
+[![build status](http://128.107.15.211:8888/ci/projects/4/status.png?ref=master)](http://128.107.15.211:8888/ci/projects/4?ref=master)
+
 Provide a text golang template replacement based on an input map set.
 
 I was running into use cases with multiple secrets or text replacement
