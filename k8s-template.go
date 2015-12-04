@@ -94,20 +94,11 @@ var debugText string
 
 func init() {
 	flag.Parse()
-	if *Version {
+	if *version {
 		array := strings.Split(os.Args[0], "/")
 		me := array[len(array)-1]
 		fmt.Println(me, "Build:", Build, "Commit:", Commit)
 	}
-	// if len(*debugFileName) > 0 {
-	// 	var err error
-	// 	debugFile, err = os.Create(*debugFileName)
-	// 	debugFile, err = os.OpenFile(*debugFileName, os.O_RDWR, 0666)
-	// 	if err != nil {
-	// 		fmt.Fprintln(os.Stderr, err)
-	// 		os.Exit(3)
-	// 	}
-	// }
 }
 
 func Usage() {
