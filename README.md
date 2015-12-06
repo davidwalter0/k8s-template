@@ -1,6 +1,5 @@
 ### k8s-template
-
-[![build status](http://128.107.15.211:8888/ci/projects/4/status.png?ref=master)](http://128.107.15.211:8888/ci/projects/4?ref=master)
+[![build status](https://128.107.14.75/ci/projects/4/status.png?ref=master)](https://128.107.14.75/ci/projects/4?ref=master)
 
 Provide a text golang template replacement based on an input map set.
 
