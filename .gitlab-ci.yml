@@ -2,9 +2,9 @@ stages:
   - build
   
 variables:
-  gitlab_user:       "root"
+  gitlab_user:       "build.bot.0.cis.paas"
   gitlab_host:       "128.107.14.75"
-  gitlab_port:       "8888"
+  gitlab_port:       "443"
   slack:             "http://ci-secret-config/slack.sh"
   config_url:        "http://ci-secret-config/slack.url"
   secret_url:        "http://ci-secret-config/kubeconfig"
