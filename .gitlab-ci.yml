@@ -9,7 +9,7 @@ variables:
   config_url:        "http://ci-secret-config/slack.url"
   secret_url:        "http://ci-secret-config/kubeconfig"
   deploy_yaml:       "http://ci-secret-config/deploy.yaml"
-  debug:             "0"
+  debug:             "1"
   registry:          "k8s-docker-registry:5000"
   GIT_SSL_NO_VERIFY: "1"
   GIT_SSL_CAINFO:    "${HOME}/.private/gitlab.crt"
