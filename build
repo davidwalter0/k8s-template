@@ -9,4 +9,8 @@ fi
 if go version|grep -q 1.5 ; then
     args="-s -w -X main.Build=$(date -u +%Y.%m.%d.%H.%M.%S.%:::z) -X main.Commit=$(git log --format=%hash-%aI -n1)"
 fi
-GOPATH=/go:${dir}/vendor CGO_ENABLED=0 go build --tags netgo -ldflags "${args}" -o ${dir}/bin/${name} ${name}.go
+
+export GOPATH=/go:${dir}/vendor 
+export CGO_ENABLED=0
+go get
+go build --tags netgo -ldflags "${args}" -o ${dir}/bin/${name} ${name}.go
