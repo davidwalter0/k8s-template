@@ -48,7 +48,7 @@ import (
 	"text/template"
 )
 
-var TemplateFile = flag.String("template", "", "file with templates to replace")
+var TemplateFile = flag.String("template", "", "file with templates to replace, or if not set, act as a filter.")
 var MappingsFile = flag.String("mappings", "mappings.yaml", "describe the replacement values")
 var version = flag.Bool("version", false, "print build and git commit as a version string")
 var debug = flag.Bool("debug", false, "dump additional debugging information on template apply failure")
@@ -85,8 +85,98 @@ func Base64Encode(text string) string {
 	return base64.StdEncoding.EncodeToString([]byte(text))
 }
 
+func Split(text string) []string {
+	return strings.Split(text, " ")
+}
+
+func First(text string) string {
+	array := strings.Split(text, " ")
+
+	if len(array) > 0 {
+		text = array[0]
+	} else {
+		text = ""
+	}
+	return text
+}
+
+func Trim(text string) string {
+	return strings.Trim(text, " ")
+}
+
+// split list1 list2 and append with separator
+func Zip(list1, list2, separator string) string {
+	l1 := strings.Split(list1, " ")
+	l2 := strings.Split(list2, " ")
+	if len(separator) == 0 {
+		separator = "-"
+	}
+	text := ""
+	for _, x := range l2 {
+		for j, y := range l1 {
+			if j < len(l1) {
+				text += " "
+			}
+			text += x + separator + y
+		}
+	}
+	return text
+}
+
+func ZipPrefix(text, prefix, separator string) []string {
+	array := strings.Split(text, " ")
+	text = ""
+	for i, x := range array {
+		if len(separator) > 0 {
+			array[i] = prefix + separator + x
+		} else {
+			array[i] = prefix + "-" + x
+		}
+	}
+	return array
+}
+
+func ZipSuffix(text, suffix, separator string) []string {
+	array := strings.Split(text, " ")
+	text = ""
+	for i, x := range array {
+		if len(separator) > 0 {
+			array[i] = x + separator + suffix
+		} else {
+			array[i] = x + "-" + suffix
+		}
+	}
+	return array
+}
+
+func Cat(in ...string) string {
+	text := ""
+	for _, x := range in {
+		text += text + x
+	}
+	return text
+}
+
+// func Switch(xin ...string) string {
+// 	text := ""
+// 	for _, x := range in {
+// 		text += text + x
+// 	}
+// 	return text
+// }
+
 var fmap = template.FuncMap{
 	"base64Encode": Base64Encode,
+	"split":        Split,
+	// zip 2 space separated lists with a separator char like "."
+	// "a b c" "1 2 3" "." -> "a.1 a.2 a.3 b.1 b.2 b.3"
+	"zip":       Zip,
+	"zipPrefix": ZipPrefix,
+	"zipSuffix": ZipSuffix,
+	"trim":      Trim,
+	"first":     First,
+	// "switch":    Switch,
+	"cat": Cat,
 }
 
 // var debugFile *os.File = os.Stdout
@@ -185,7 +275,12 @@ func Load(filename string) []byte {
 			os.Exit(3)
 		}
 	} else {
-		Usage()
+		text, err = ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			Elog.Printf("%v.\n", err)
+			os.Exit(3)
+		}
+		// Usage()
 	}
 	return text
 }
@@ -200,6 +295,12 @@ func main() {
 	defer RecoverWithMessage("main", false, 3)
 	var err error
 	TemplateText = Load(*TemplateFile)
+
+	if len(*TemplateFile) == 0 {
+		var stdin = "stdin"
+		TemplateFile = &stdin
+	}
+
 	ReplacementText = Load(*MappingsFile)
 	data, err := transform.Yaml2Json(ReplacementText)
 	if err != nil {
