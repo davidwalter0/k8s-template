@@ -1,5 +1,5 @@
 .PHONY: deps
-# GOPATH=/go
+export GOPATH=/go
 SHELL=/bin/bash
 MAKEFILE_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 CURRENT_DIR := $(notdir $(patsubst %/,%,$(dir $(MAKEFILE_DIR))))
