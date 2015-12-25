@@ -86,9 +86,13 @@ If value: text use text as the source value
 */
 
 type ReplacementMapping map[string]string
+type FileMapped map[string]bool
+type Base64Mapped map[string]bool
 
 var MappingDefinition []map[string]interface{}
 var Mapping ReplacementMapping = make(ReplacementMapping)
+var fileMapped = make(FileMapped)
+var base64Mapped = make(Base64Mapped)
 
 type TemplateMapping struct {
 	Name   string `json:"name"`
@@ -320,16 +324,26 @@ func (tm *TemplateMapping) Parse(InData map[string]interface{}) {
 		tm.Value = os.Getenv(tm.Value)
 	}
 
-	if tm.File && !templateRegex.MatchString(tm.Value) && !*preprocess {
-		path := tm.Value
-		if len(path) > 2 && path[:2] == "~/" {
-			path = strings.Replace(path, "~/", os.Getenv("HOME")+"/", 1)
+	if tm.File {
+		if !templateRegex.MatchString(tm.Value) && !*preprocess {
+			path := tm.Value
+			if len(path) > 2 && path[:2] == "~/" {
+				path = strings.Replace(path, "~/", os.Getenv("HOME")+"/", 1)
+			}
+			tm.Value = string(Load(path))
 		}
-		tm.Value = string(Load(path))
+
+		if *preprocess {
+			fileMapped[tm.Name] = true
+		}
 	}
 
 	if tm.Base64 {
-		tm.Value = Base64Encode(tm.Value)
+		if *preprocess {
+			base64Mapped[tm.Name] = true
+		} else {
+			tm.Value = Base64Encode(tm.Value)
+		}
 	}
 
 	if *debug {
@@ -441,19 +455,27 @@ func SelfReference(m *ReplacementMapping) {
 
 func Preprocess(Mapping ReplacementMapping, dump bool) {
 	var keys []string
-	var OutMap []ReplacementMapping = make([]ReplacementMapping, 0)
+	var OutMap []TemplateMapping = make([]TemplateMapping, 0)
 	for k, _ := range Mapping {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		var T ReplacementMapping = make(ReplacementMapping)
-		T["name"] = key
-		T["value"] = Mapping[key]
+		var T TemplateMapping
+		T.Name = key
+		T.Value = Mapping[key]
+		T.File = false
+		if fileMapped[key] {
+			T.File = true
+		}
+		if base64Mapped[key] {
+			T.Base64 = true
+		}
+
 		OutMap = append(OutMap, T)
 	}
 	if dump {
-		fmt.Println(Yamlify(OutMap))
+		fmt.Println(Json2Yaml([]byte(Jsonify(OutMap))))
 	}
 }
 
