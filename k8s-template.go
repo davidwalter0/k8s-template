@@ -4,17 +4,22 @@ template:
 Accepts a yaml formatted array of maps of mappings for substitution name:
 
 name: the name used for pattern matching by golang template replacement
-value:
-optional: bool flags:
-file:[true|false] -- read from the file named in value
+
+value: the text value to replace the mapping with
+
+optional: flags:
+
+file:  [true|false] -- read from the file named in value
 base64:[true|false] -- convert the final text to base64
-env:[true|false] -- read from the environment
+env:   [true|false] -- read from the environment
 
 Replace golang template formatted targets with values specified in the
 mappings names.
 
 Formatted --template input file has template replacement performed on it. The
 resulting replacement target is printed to stdout.
+
+--preprocess can be used to perform self referential mappings
 
 The yaml formattted mappings file can be similar to the following:
 
@@ -42,10 +47,12 @@ import (
 	"fmt"
 	"github.com/davidwalter0/logger"
 	"github.com/davidwalter0/transform"
+	yaml "gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -53,6 +60,7 @@ import (
 
 var TemplateFile = flag.String("template", "", "file with templates to replace, or if not set, act as a filter.")
 var MappingsFile = flag.String("mappings", "", "describe the replacement values")
+var preprocess = flag.Bool("preprocess", false, "dump to standard output the preprocessed, template replacements of a mapping skipping file inclusion")
 var version = flag.Bool("version", false, "print build and git commit as a version string")
 var debug = flag.Bool("debug", false, "dump additional debugging information on template apply failure")
 
@@ -65,6 +73,8 @@ var Plain = logger.Plain
 
 var Build string  // from the build ldflag options
 var Commit string // from the build ldflag options
+
+var templateRegex *regexp.Regexp
 
 /*
 TemplateMapping
@@ -251,6 +261,8 @@ func init() {
 		me := array[len(array)-1]
 		fmt.Println(me, "Build:", Build, "Commit:", Commit)
 	}
+
+	templateRegex, _ = regexp.Compile("{{.*}}")
 }
 
 func Usage() {
@@ -308,7 +320,7 @@ func (tm *TemplateMapping) Parse(InData map[string]interface{}) {
 		tm.Value = os.Getenv(tm.Value)
 	}
 
-	if tm.File {
+	if tm.File && !templateRegex.MatchString(tm.Value) && !*preprocess {
 		path := tm.Value
 		if len(path) > 2 && path[:2] == "~/" {
 			path = strings.Replace(path, "~/", os.Getenv("HOME")+"/", 1)
@@ -390,30 +402,102 @@ func main() {
 		defer f.Close()
 		Plain.SetOutput(f)
 	}
-	// Prepare to re-apply templates to interpolate template local self
-	// referential mappings. After this is done, the local template
-	// references should have been replaced.
-	r, _ := regexp.Compile("{{.*}}")
-	for k, v := range Mapping {
-		before := v
-		for r.MatchString(before) {
-			// Plain.Printf("k [%s] v [%s]\n", k, v)
-			out := TemplateApplyString(Mapping, v)
-			if *debug {
-				Plain.Printf("k [%s] v [%s] out [%s]\n", k, v, out)
+	SelfReference(&Mapping)
+	if *preprocess {
+		Preprocess(Mapping, IOStdin)
+	}
+	if !*preprocess {
+		TemplateApply(Mapping, TemplateText)
+	}
+}
+
+// Apply template reconciliation to mappings templates to interpolate
+// template local self referential mappings. After this is done, the
+// local template references should have been replaced.
+func SelfReference(m *ReplacementMapping) {
+	Mapping := *m
+	var done bool = false
+	// Continue while there are replacements being made
+	for !done {
+		done = true
+		for k, v := range Mapping {
+			before := v
+			for templateRegex.MatchString(before) {
+				out := TemplateApplyString(Mapping, v)
+				after := out
+				// If there is a mapping without changes, this has been
+				// processed as much as it can be for now.
+				if before == after {
+					break
+				} else {
+					done = false
+				}
+				Mapping[k] = after
+				before = after
 			}
-			after := out
-			// If there is a mapping without a local mapping, there's no
-			// more work that can be done.
-			if before == after {
-				break
-			}
-			Mapping[k] = after
-			before = after
 		}
 	}
+}
 
-	TemplateApply(Mapping, TemplateText)
+func Preprocess(Mapping ReplacementMapping, dump bool) {
+	var keys []string
+	var OutMap []ReplacementMapping = make([]ReplacementMapping, 0)
+	for k, _ := range Mapping {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		var T ReplacementMapping = make(ReplacementMapping)
+		T["name"] = key
+		T["value"] = Mapping[key]
+		OutMap = append(OutMap, T)
+	}
+	if dump {
+		fmt.Println(Yamlify(OutMap))
+	}
+}
+
+func Jsonify(data interface{}) string {
+	var err error
+	data, err = transform.TransformData(data)
+	if err != nil {
+		return fmt.Sprintf("%v", err)
+	}
+	s, err := json.MarshalIndent(data, "", "  ") // spaces)
+	if err != nil {
+		return fmt.Sprintf("%v", err)
+	}
+	return string(s)
+}
+
+func Json2Yaml(input []byte) string {
+	var data interface{}
+	var err = json.Unmarshal(input, &data)
+	if err != nil {
+		return fmt.Sprintf("%v", err)
+	}
+	data, err = transform.TransformData(data)
+	if err != nil {
+		return fmt.Sprintf("%v", err)
+	}
+
+	output, err := yaml.Marshal(data)
+	if err != nil {
+		return fmt.Sprintf("%v", err)
+	}
+	return string(output)
+}
+
+func Yamlify(data interface{}) string {
+	data, err := transform.TransformData(data)
+	if err != nil {
+		return fmt.Sprintf("%v", err)
+	}
+	s, err := yaml.Marshal(data)
+	if err != nil {
+		return fmt.Sprintf("%v", err)
+	}
+	return string(s)
 }
 
 func TemplateApplyString(mapping ReplacementMapping, text string) string { // string {
