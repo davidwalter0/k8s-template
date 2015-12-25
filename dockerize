@@ -3,7 +3,8 @@ dir=$(dirname $(readlink -f ${0}))
 cd ${dir}
 name=${dir##*/}
 cat > Dockerfile <<EOF
-FROM alpine:3.2
+#FROM alpine:3.2
+FROM scratch
 COPY bin/ /bin/
 EOF
 

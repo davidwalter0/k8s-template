@@ -32,7 +32,7 @@ bin/%: %.go
 	fi;															\
 	CGO_ENABLED=0 go get --tags netgo -ldflags "$${args}" ;									\
 	CGO_ENABLED=0 go build --tags netgo -ldflags "$${args}" -o $@ $^ ;
-
+	cp $@ /go/bin/
 
 init: get save
 

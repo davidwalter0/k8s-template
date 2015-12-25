@@ -35,6 +35,7 @@ translation later
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -43,13 +44,15 @@ import (
 	"github.com/davidwalter0/transform"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"text/template"
 )
 
 var TemplateFile = flag.String("template", "", "file with templates to replace, or if not set, act as a filter.")
-var MappingsFile = flag.String("mappings", "mappings.yaml", "describe the replacement values")
+var MappingsFile = flag.String("mappings", "", "describe the replacement values")
 var version = flag.Bool("version", false, "print build and git commit as a version string")
 var debug = flag.Bool("debug", false, "dump additional debugging information on template apply failure")
 
@@ -72,6 +75,11 @@ If value: text use text as the source value
 
 */
 
+type ReplacementMapping map[string]string
+
+var MappingDefinition []map[string]interface{}
+var Mapping ReplacementMapping = make(ReplacementMapping)
+
 type TemplateMapping struct {
 	Name   string `json:"name"`
 	Value  string `json:"value"`
@@ -85,12 +93,14 @@ func Base64Encode(text string) string {
 	return base64.StdEncoding.EncodeToString([]byte(text))
 }
 
+// Split a string to an array of strings on a space character
 func Split(text string) []string {
-	return strings.Split(text, " ")
+	return strings.Split(Trim(text), " ")
 }
 
+// First item in an array split on spaces, using Split
 func First(text string) string {
-	array := strings.Split(text, " ")
+	array := Split(text)
 
 	if len(array) > 0 {
 		text = array[0]
@@ -100,14 +110,56 @@ func First(text string) string {
 	return text
 }
 
+// Nth zero offset item in the array after the text argument is split on spaces
+func Nth(nstr string, text string) string {
+	n, _ := strconv.Atoi(nstr)
+	array := Split(text)
+	// if *debug {
+	// 	f, err := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	// 	if err != nil {
+	// 		Elog.Fatalf("error opening file: %v", err)
+	// 	}
+	// 	defer f.Close()
+
+	// 	Plain.SetOutput(f)
+	// 	Plain.Printf("ns %s text %s\n", nstr, text)
+	// 	Plain.Printf("nstr %s n %d text %s\n", nstr, n, text)
+	// 	Plain.Printf("array %v\n", array)
+	// 	Plain.Printf("len(array) = %d array[%d] array[n]  %v\n", len(array), n, array[n])
+	// }
+	if len(array) > n {
+		return array[n]
+	} else {
+		return ""
+	}
+}
+
+// Trim spaces from a string
 func Trim(text string) string {
 	return strings.Trim(text, " ")
 }
 
+// Delimit a space separated string with delimiter [ default comma ',' ]
+func Delimit(text string, delimiter string) (o string) {
+	if len(delimiter) == 0 {
+		delimiter = ","
+	}
+	array := Split(text)
+	for i, x := range array {
+		if i > 0 {
+			o += delimiter
+		}
+		o += x
+	}
+	return o
+}
+
+// zip 2 space separated lists with a separator char like "."
+// "a b c" "1 2 3" "." -> "a.1 a.2 a.3 b.1 b.2 b.3"
 // split list1 list2 and append with separator
 func Zip(list1, list2, separator string) string {
-	l1 := strings.Split(list1, " ")
-	l2 := strings.Split(list2, " ")
+	l1 := strings.Split(Trim(list1), " ")
+	l2 := strings.Split(Trim(list2), " ")
 	if len(separator) == 0 {
 		separator = "-"
 	}
@@ -123,28 +175,38 @@ func Zip(list1, list2, separator string) string {
 	return text
 }
 
+// return the text of the index of search [find] from in text
+func Index(find, in string) (text string) {
+	array := strings.Split(Trim(in), " ")
+	for i, x := range array {
+		if find == x {
+			text = strconv.Itoa(i)
+			break
+		}
+	}
+	return text
+}
+
 func ZipPrefix(text, prefix, separator string) []string {
-	array := strings.Split(text, " ")
+	if len(separator) == 0 {
+		separator = "-"
+	}
+	array := Split(text)
 	text = ""
 	for i, x := range array {
-		if len(separator) > 0 {
-			array[i] = prefix + separator + x
-		} else {
-			array[i] = prefix + "-" + x
-		}
+		array[i] = prefix + separator + x
 	}
 	return array
 }
 
 func ZipSuffix(text, suffix, separator string) []string {
-	array := strings.Split(text, " ")
+	if len(separator) == 0 {
+		separator = "-"
+	}
+	array := Split(text)
 	text = ""
 	for i, x := range array {
-		if len(separator) > 0 {
-			array[i] = x + separator + suffix
-		} else {
-			array[i] = x + "-" + suffix
-		}
+		array[i] = x + separator + suffix
 	}
 	return array
 }
@@ -166,17 +228,17 @@ func Cat(in ...string) string {
 // }
 
 var fmap = template.FuncMap{
+	"cat":          Cat,
+	"nth":          Nth,
+	"delimit":      Delimit, // replace space with ,
 	"base64Encode": Base64Encode,
 	"split":        Split,
-	// zip 2 space separated lists with a separator char like "."
-	// "a b c" "1 2 3" "." -> "a.1 a.2 a.3 b.1 b.2 b.3"
-	"zip":       Zip,
-	"zipPrefix": ZipPrefix,
-	"zipSuffix": ZipSuffix,
-	"trim":      Trim,
-	"first":     First,
-	// "switch":    Switch,
-	"cat": Cat,
+	"zip":          Zip,
+	"zipPrefix":    ZipPrefix,
+	"zipSuffix":    ZipSuffix,
+	"trim":         Trim,
+	"first":        First,
+	"index":        Index,
 }
 
 // var debugFile *os.File = os.Stdout
@@ -285,23 +347,26 @@ func Load(filename string) []byte {
 	return text
 }
 
-type ReplacementMapping map[string]string
-
-var MappingDefinition []map[string]interface{}
-
-var Mapping ReplacementMapping = make(ReplacementMapping)
-
 func main() {
 	defer RecoverWithMessage("main", false, 3)
 	var err error
-	TemplateText = Load(*TemplateFile)
 
-	if len(*TemplateFile) == 0 {
-		var stdin = "stdin"
-		TemplateFile = &stdin
+	if len(*TemplateFile) == 0 && len(*MappingsFile) == 0 {
+		TemplateText, err = ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			Elog.Printf("%v.\n", err)
+			os.Exit(3)
+		}
+		ReplacementText = TemplateText
+	} else {
+		TemplateText = Load(*TemplateFile)
+		if len(*TemplateFile) == 0 {
+			var stdin = "stdin"
+			TemplateFile = &stdin
+		}
+		ReplacementText = Load(*MappingsFile)
 	}
 
-	ReplacementText = Load(*MappingsFile)
 	data, err := transform.Yaml2Json(ReplacementText)
 	if err != nil {
 		fmt.Println(err, "error transforming Yaml2Json")
@@ -313,7 +378,50 @@ func main() {
 		tm.Parse(InData)
 		Mapping[tm.Name] = tm.Value
 	}
+
+	if *debug {
+		f, err := os.OpenFile("debug.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			Elog.Fatalf("error opening file: %v", err)
+		}
+		defer f.Close()
+		Plain.SetOutput(f)
+	}
+	// Prepare to re-apply templates to self to eliminate self references.
+	r, _ := regexp.Compile("{{.*}}")
+	for k, v := range Mapping {
+		before := v
+		for r.MatchString(before) {
+			// Plain.Printf("k [%s] v [%s]\n", k, v)
+			out := TemplateApplyString(Mapping, v)
+			if *debug {
+				Plain.Printf("k [%s] v [%s] out [%s]\n", k, v, out)
+			}
+			after := out
+			if before == after {
+				break
+			}
+			Mapping[k] = after
+			before = after
+		}
+	}
 	TemplateApply(Mapping, TemplateText)
+}
+
+func TemplateApplyString(mapping ReplacementMapping, text string) string { // string {
+	defer RecoverWithMessage("TemplateApplyString", false, 3)
+	buffer := new(bytes.Buffer)
+	tmpl, err := template.New("TemplateApplyString").Funcs(fmap).Parse(text)
+	err = tmpl.Execute(buffer, mapping)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "Is the template file missing a mapping?\nCheck the line number of the error to see if the mapping file has that argument.")
+		if len(debugText) > 0 {
+			fmt.Fprintf(os.Stderr, "\nInput debug mappings:\n")
+			fmt.Fprintln(os.Stderr, debugText)
+		}
+	}
+	return buffer.String()
 }
 
 func TemplateApply(mapping ReplacementMapping, InText []byte) { // string {

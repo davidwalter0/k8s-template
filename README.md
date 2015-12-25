@@ -128,6 +128,11 @@ data:
 
 - ```bin/k8s-template --template=template.yaml --mappings=mappings.yaml```
 
+Pre apply templates to a mapping, providing self referential template
+mappings
+
+- ```bin/k8s-template < template.yaml > new.template.yaml```
+
 
 ---
 #### Known issue [ based on os.Getenv and some environments ]
