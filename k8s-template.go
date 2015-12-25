@@ -420,7 +420,7 @@ func main() {
 	if *preprocess {
 		Preprocess(Mapping, IOStdin)
 	}
-	if !*preprocess {
+	if !IOStdin && !*preprocess {
 		TemplateApply(Mapping, TemplateText)
 	}
 }
@@ -538,21 +538,18 @@ func TemplateApplyString(mapping ReplacementMapping, text string) string { // st
 	return buffer.String()
 }
 
-func TemplateApply(mapping ReplacementMapping, InText []byte) { // string {
+func TemplateApply(mapping ReplacementMapping, ttext []byte) { // string {
 	defer RecoverWithMessage("TemplateApply", false, 3)
-	tmpl, err := template.New(*TemplateFile).Funcs(fmap).Parse(string(InText))
-	if err != nil {
-		Elog.Fatal(err)
-	}
-	err = tmpl.Execute(os.Stdout, mapping)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintf(os.Stderr, "Is the template file missing a mapping?\nCheck the line number of the error to see if the mapping file has that argument.")
-		if len(debugText) > 0 {
-			fmt.Fprintf(os.Stderr, "\nInput debug mappings:\n")
-			fmt.Fprintln(os.Stderr, debugText)
+	text := string(ttext)
+	for templateRegex.MatchString(text) {
+		after := TemplateApplyString(Mapping, text)
+		// If there is a mapping without changes, this has been
+		// processed as much as it can be for now.
+		if text == after {
+			break
 		}
-		os.Exit(3)
+		text = after
 	}
+	fmt.Fprintln(os.Stdout, text)
 	os.Stdout.Sync()
 }
