@@ -57,7 +57,7 @@ var version = flag.Bool("version", false, "print build and git commit as a versi
 var debug = flag.Bool("debug", false, "dump additional debugging information on template apply failure")
 
 var TemplateText []byte
-var ReplacementText []byte
+var ReplacementMappingSourceText []byte
 
 var Info = logger.Info
 var Elog = logger.Error
@@ -347,27 +347,30 @@ func Load(filename string) []byte {
 	return text
 }
 
+var IOStdin bool = false
+
 func main() {
 	defer RecoverWithMessage("main", false, 3)
 	var err error
 
 	if len(*TemplateFile) == 0 && len(*MappingsFile) == 0 {
+		IOStdin = true
 		TemplateText, err = ioutil.ReadAll(os.Stdin)
 		if err != nil {
 			Elog.Printf("%v.\n", err)
 			os.Exit(3)
 		}
-		ReplacementText = TemplateText
+		ReplacementMappingSourceText = TemplateText
 	} else {
 		TemplateText = Load(*TemplateFile)
 		if len(*TemplateFile) == 0 {
 			var stdin = "stdin"
 			TemplateFile = &stdin
 		}
-		ReplacementText = Load(*MappingsFile)
+		ReplacementMappingSourceText = Load(*MappingsFile)
 	}
 
-	data, err := transform.Yaml2Json(ReplacementText)
+	data, err := transform.Yaml2Json(ReplacementMappingSourceText)
 	if err != nil {
 		fmt.Println(err, "error transforming Yaml2Json")
 		os.Exit(3)
@@ -387,7 +390,9 @@ func main() {
 		defer f.Close()
 		Plain.SetOutput(f)
 	}
-	// Prepare to re-apply templates to self to eliminate self references.
+	// Prepare to re-apply templates to interpolate template local self
+	// referential mappings. After this is done, the local template
+	// references should have been replaced.
 	r, _ := regexp.Compile("{{.*}}")
 	for k, v := range Mapping {
 		before := v
@@ -398,6 +403,8 @@ func main() {
 				Plain.Printf("k [%s] v [%s] out [%s]\n", k, v, out)
 			}
 			after := out
+			// If there is a mapping without a local mapping, there's no
+			// more work that can be done.
 			if before == after {
 				break
 			}
@@ -405,6 +412,7 @@ func main() {
 			before = after
 		}
 	}
+
 	TemplateApply(Mapping, TemplateText)
 }
 
