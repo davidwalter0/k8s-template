@@ -158,7 +158,7 @@ func Delimit(text string, delimiter string) (o string) {
 	if len(delimiter) == 0 {
 		delimiter = ","
 	}
-	array := Split(text)
+	array := Split(Trim(text))
 	for i, x := range array {
 		if i > 0 {
 			o += delimiter
@@ -205,7 +205,7 @@ func ZipPrefix(text, prefix, separator string) []string {
 	if len(separator) == 0 {
 		separator = "-"
 	}
-	array := Split(text)
+	array := Split(Trim(text))
 	text = ""
 	for i, x := range array {
 		array[i] = prefix + separator + x
@@ -217,7 +217,7 @@ func ZipSuffix(text, suffix, separator string) []string {
 	if len(separator) == 0 {
 		separator = "-"
 	}
-	array := Split(text)
+	array := Split(Trim(text))
 	text = ""
 	for i, x := range array {
 		array[i] = x + separator + suffix
