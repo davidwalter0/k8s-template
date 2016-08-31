@@ -13,6 +13,7 @@ type Logger *log.Logger
 var (
 	Trace   *log.Logger
 	Info    *log.Logger
+	Debug   *log.Logger
 	Warning *log.Logger
 	Error   *log.Logger
 	Plain   *log.Logger
@@ -20,6 +21,7 @@ var (
 
 func Init(
 	traceHandle io.Writer,
+	debugHandle io.Writer,
 	infoHandle io.Writer,
 	warningHandle io.Writer,
 	errorHandle io.Writer,
@@ -28,6 +30,10 @@ func Init(
 	Trace = log.New(traceHandle,
 		"TRACE: ",
 		log.Ldate|log.Ltime|log.Lshortfile)
+
+	Debug = log.New(debugHandle,
+		"DEBUG: ",
+		log.Llongfile)
 
 	Info = log.New(infoHandle,
 		"INFO: ",
@@ -49,5 +55,5 @@ func Args2String(args []interface{}) string {
 }
 
 func init() {
-	Init(ioutil.Discard, os.Stdout, os.Stdout, os.Stderr, os.Stdout)
+	Init(ioutil.Discard, os.Stdout, os.Stdout, os.Stdout, os.Stderr, os.Stdout)
 }

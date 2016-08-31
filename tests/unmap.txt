@@ -1,0 +1,25 @@
+- name: K8sNodeList: >> {{ .K8sNodeList }} <<
+- name: K8sNs: >> {{ .K8sNs }} <<
+- name: dot: >> {{ .dot }} <<
+- name: Namespaces: >> {{ .Namespaces }} <<
+- name: K8sRemoteNsNodeList: >> {{ .K8sRemoteNsNodeList }} <<
+- name: K8sNsHost: >> {{ .K8sNsHost }} <<
+- name: File: >> {{ .File }} <<
+- name: FileBase64: >> {{ .FileBase64 }} <<
+- name: FileLiteral: >> {{ .FileLiteral }} <<
+- name: FileLiteralBase64: >> {{ .FileLiteralBase64 }} <<
+- name: Http: >> {{ .Http }} <<
+- name: HttpBase64: >> {{ .HttpBase64 }} <<
+- name: HttpLiteral: >> {{ .HttpLiteral }} <<
+- name: HttpLiteralBase64: >> {{ .HttpLiteralBase64 }} <<
+
+- name: NText: >> {{ .NText }} <<
+- name: FileName: >> {{ .FileName }} <<
+- name: URI: >> {{ .URI }} <<
+- name: Split: >> {{ split "a aa bb cc" }} <<
+- name: Nth: >> '{{ nth "2" "a aa bb cc" }}' <<
+- name: Index: >> '{{ index "bb" "  <a aa bb cc>  " }}' <<
+- name: First: >> '{{ first "  <a aa bb cc>  " }}' <<
+- name: Trim: >> '{{ trim "  <a aa bb cc>  " }}' <<
+- name: 3rd item of {{ .K8sRemoteNsNodeList }} list '{{ nth "3" .K8sRemoteNsNodeList }}'
+

@@ -99,12 +99,12 @@ metadata:
   namespace: default
   name: {{ .Publish }}-cfg-secret
 data:
-  path: {{ .Path }}
-  hostname: {{ .Hostname }}
+  path: {{ .PATH }}
+  hostname: {{ .HOSTNAME }}
+  path-plain: {{ .PATH | base64Decode }}
+  hostname-plain: {{ .HOSTNAME | base64Decode }}
   id-rsa: {{ .PrivateKey | base64Encode }}
   id-rsa.pub: {{ .PublicKey | base64Encode }}
-  slackurl: {{ .SlackUrl }}
-  kubeconfig: {{ .KubeConfig }}
   deploy.yaml: {{ .YamlConfig | base64Encode }}
   authorized-keys: {{ .PublicKey | base64Encode }}
 

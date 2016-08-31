@@ -126,12 +126,12 @@ data:
 
 *bin/k8s-template*
 
-- ```bin/k8s-template --template=template.yaml --mappings=mappings.yaml```
+- ```bin/k8s-template --template=tests/template.yaml --mappings=tests/mappings.yaml```
 
 Pre apply templates to a mapping, providing self referential template
 mappings
 
-- ```bin/k8s-template < template.yaml > new.template.yaml```
+- ```bin/k8s-template < tests/template.yaml > tests/preprocessed.yaml```
 
 
 ---

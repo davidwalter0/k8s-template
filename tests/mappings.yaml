@@ -1,0 +1,95 @@
+- name: Publish
+  value: myapp
+
+- name: LBName
+  value: mylb
+
+- name: RegistryName
+  value: my-container-registry.io
+
+- name: PATH
+  env: true
+  base64: true
+  value: PATH
+
+- name: HOSTNAME
+  base64: true
+  env: true
+  value: HOSTNAME
+
+- name: PrivateKey
+  file: true
+  value: "~/.ssh/junk.key"
+
+- name: PublicKey
+  file: true
+  value: "~/.ssh/junk.key"
+
+- name: YamlConfig
+  value: tests/template.yaml
+  file: true
+
+- name: K8sNodeList
+  value: 'node-0 node-1 node-2 node-3 node-4'
+
+- name: K8sNs
+  env: true
+  value: K8SNameSpace
+
+- name: dot
+  value: '.'
+
+- name: Namespaces
+  value: 'smoke canary test prod default'
+
+- name: Nth
+  value: '{{ index .K8sNs .Namespaces }}'
+
+- name: K8sRemoteNsNodeList
+  value: '{{ range $x := zipSuffix .K8sNodeList .K8sNs .dot }}{{ . }} {{end}}'
+
+- name: K8sNsHost
+  value: '{{ nth .Nth .K8sNodeList }}'
+
+- name: NText
+  value: '{{ .Nth }}'
+
+- name: FileName
+  value: tests/file.txt
+
+- name: File
+  file: true
+  value: '{{.FileName}}'
+
+- name: FileBase64
+  base64: true
+  file: true
+  value: tests/file.txt
+
+- name: FileLiteral
+  value: '{{.File}}'
+
+- name: FileLiteralBase64
+  value: '{{.FileBase64}}'
+
+- name: Port
+  env: true
+  value: SIMPLE_FILE_SERVER_PORT
+
+- name: URI
+  value: 'http://localhost:{{ .Port }}/tests/file.txt'
+
+- name: Http
+  uri: true
+  value: '{{ .URI }}'
+
+- name: HttpBase64
+  base64: true
+  uri: true
+  value: 'http://localhost:{{ .Port }}/tests/file.txt'
+
+- name: HttpLiteral
+  value: '{{ .Http }}'
+
+- name: HttpLiteralBase64
+  value: '{{ .HttpBase64 }}'

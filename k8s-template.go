@@ -45,10 +45,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/davidwalter0/logger"
+	"github.com/davidwalter0/k8s-template/logger"
 	"github.com/davidwalter0/transform"
 	yaml "gopkg.in/yaml.v2"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"regexp"
 	"runtime"
@@ -63,12 +64,14 @@ var MappingsFile = flag.String("mappings", "", "describe the replacement values"
 var preprocess = flag.Bool("preprocess", false, "dump to standard output the preprocessed, template replacements of a mapping skipping file inclusion")
 var version = flag.Bool("version", false, "print build and git commit as a version string")
 var debug = flag.Bool("debug", false, "dump additional debugging information on template apply failure")
+var InplaceTemplatesOnly = flag.Bool("inplace", false, "Use inplace commands only, don't use a yaml formatted mappings file at all.")
 
 var TemplateText []byte
 var ReplacementMappingSourceText []byte
 
 var Info = logger.Info
 var Elog = logger.Error
+var Debug = logger.Debug
 var Plain = logger.Plain
 
 var Build string  // from the build ldflag options
@@ -87,11 +90,13 @@ If value: text use text as the source value
 
 type ReplacementMapping map[string]string
 type FileMapped map[string]bool
+type UriMapped map[string]bool
 type Base64Mapped map[string]bool
 
 var MappingDefinition []map[string]interface{}
 var Mapping ReplacementMapping = make(ReplacementMapping)
 var fileMapped = make(FileMapped)
+var uriMapped = make(UriMapped)
 var base64Mapped = make(Base64Mapped)
 
 type TemplateMapping struct {
@@ -100,11 +105,54 @@ type TemplateMapping struct {
 	Base64 bool   `json:"base64,omitempty"`
 	File   bool   `json:"file,omitempty"`
 	Env    bool   `json:"env,omitempty"`
+	Uri    bool   `json:"uri,omitempty"`
+}
+
+func HttpGet(uri string) (text []byte, err error) {
+	defer RecoverWithMessage("HttpGet", false, 5)
+	var response *http.Response
+	if *debug {
+		Debug.Printf("uri: %v\n>%v\n", uri, err)
+	}
+	response, err = http.Get(uri)
+	if response != nil && (response.StatusCode < 200 || response.StatusCode > 399) {
+		if *debug {
+			Debug.Fatalf("uri: %v\n>%v %v %v %v\n", uri, response.Status, response.StatusCode, err)
+		}
+		Elog.Fatalf("uri: %v\n>%v %v %v %v\n", uri, response.Status, response.StatusCode, err)
+	}
+	if err != nil {
+		if *debug {
+			Debug.Fatalf("uri: %v\n>%v\n", uri, err)
+		}
+		Elog.Fatalf("uri: %v\n>%v\n", uri, err)
+		os.Exit(1)
+	} else {
+		defer response.Body.Close()
+		text, err = ioutil.ReadAll(response.Body)
+		if err != nil {
+			if *debug {
+				Debug.Fatalf("uri: %v\n>%v\n", uri, err)
+			}
+			Elog.Fatalf("uri: %v\n>%v\n", uri, err)
+			os.Exit(1)
+		}
+	}
+	return
 }
 
 // Base64EncodeString transform input to base64 encoded data
 func Base64Encode(text string) string {
 	return base64.StdEncoding.EncodeToString([]byte(text))
+}
+
+// Base64EncodeString transform input to base64 encoded data
+func Base64Decode(text string) string {
+	lhs, err := base64.StdEncoding.DecodeString(text)
+	if err != nil {
+		Debug.Fatalf("base64 decode error: %v\n>%v\n", text, err)
+	}
+	return string(lhs)
 }
 
 // Split a string to an array of strings on a space character
@@ -228,24 +276,35 @@ func ZipSuffix(text, suffix, separator string) []string {
 func Cat(in ...string) string {
 	text := ""
 	for _, x := range in {
-		text += text + x
+		text += x
 	}
 	return text
 }
 
-// func Switch(xin ...string) string {
-// 	text := ""
-// 	for _, x := range in {
-// 		text += text + x
-// 	}
-// 	return text
-// }
+func Env(name string) string {
+	return os.Getenv(name)
+}
+
+func File(name string) string {
+	return string(Load(name))
+}
+
+func Curl(name string) string {
+	defer RecoverWithMessage("Curl", false, 4)
+	bytes, err := HttpGet(name)
+	if err != nil {
+		fmt.Println(err)
+		panic(fmt.Sprintf("%v", err))
+	}
+	return string(bytes)
+}
 
 var fmap = template.FuncMap{
 	"cat":          Cat,
 	"nth":          Nth,
 	"delimit":      Delimit, // replace space with ,
 	"base64Encode": Base64Encode,
+	"base64Decode": Base64Decode,
 	"split":        Split,
 	"zip":          Zip,
 	"zipPrefix":    ZipPrefix,
@@ -253,6 +312,10 @@ var fmap = template.FuncMap{
 	"trim":         Trim,
 	"first":        First,
 	"index":        Index,
+	"get":          HttpGet,
+	"curl":         Curl,
+	"env":          Env,
+	"file":         File,
 }
 
 // var debugFile *os.File = os.Stdout
@@ -284,19 +347,21 @@ func Trace() {
 		}
 		f := runtime.FuncForPC(pc[i])
 		file, line := f.FileLine(pc[i])
-		Info.Printf("%s:%d %s\n", file, line, f.Name())
+		// Info.Printf("%s:%d %s\n", file, line, f.Name())
+		fmt.Printf("error: %s:%d: %s\n", file, line, f.Name())
 	}
 }
 
 func RecoverWithMessage(step string, exitOnException bool, failureExitCode int) {
 	if r := recover(); r != nil {
-		Info.Printf("Recovered step[%s] with info %v\n", step, r)
+		fmt.Printf("error: Recovered step[%s] with info\n-----\n%v\n-----\n", step, r)
 		Trace()
 		pc := make([]uintptr, 10)
 		runtime.Callers(5, pc)
 		f := runtime.FuncForPC(pc[1])
 		file, line := f.FileLine(pc[1])
-		Info.Printf("call failed at or near %s:%d %s\n", file, line, f.Name())
+		// Info.Printf("call failed at or near %s:%d %s\n", file, line, f.Name())
+		fmt.Printf("error: %s:%d: %s call failed at or near\n", file, line, f.Name())
 		if exitOnException {
 			os.Exit(failureExitCode)
 		}
@@ -305,6 +370,7 @@ func RecoverWithMessage(step string, exitOnException bool, failureExitCode int) 
 
 func (tm *TemplateMapping) Parse(InData map[string]interface{}) {
 	defer RecoverWithMessage("Parse", false, 3)
+
 	for key, value := range InData {
 		switch key {
 		case "name":
@@ -317,11 +383,19 @@ func (tm *TemplateMapping) Parse(InData map[string]interface{}) {
 			tm.File = value.(bool)
 		case "env":
 			tm.Env = value.(bool)
+		case "uri":
+			tm.Uri = value.(bool)
 		}
+	}
+
+	if tm.File && tm.Uri {
+		Elog.Fatalf("Field: name: [%s]: A mapping may either be a file or uri, not both\n", tm.Name)
 	}
 
 	if tm.Env {
 		tm.Value = os.Getenv(tm.Value)
+	} else {
+		tm.Value = TemplateApplyString(Mapping, tm.Value)
 	}
 
 	if tm.File {
@@ -335,6 +409,23 @@ func (tm *TemplateMapping) Parse(InData map[string]interface{}) {
 
 		if *preprocess {
 			fileMapped[tm.Name] = true
+		}
+	}
+
+	if tm.Uri {
+		if !templateRegex.MatchString(tm.Value) &&
+			strings.HasPrefix(tm.Value, "http://") &&
+			!*preprocess {
+			uri := tm.Value
+			text, err := HttpGet(uri)
+			if err != nil {
+				return
+			}
+			tm.Value = string(text)
+		}
+
+		if *preprocess {
+			uriMapped[tm.Name] = true
 		}
 	}
 
@@ -378,22 +469,41 @@ var IOStdin bool = false
 func main() {
 	defer RecoverWithMessage("main", false, 3)
 	var err error
+	ReplacementMappingSourceText = make([]byte, 0)
 
-	if len(*TemplateFile) == 0 && len(*MappingsFile) == 0 {
-		IOStdin = true
-		TemplateText, err = ioutil.ReadAll(os.Stdin)
-		if err != nil {
-			Elog.Printf("%v.\n", err)
-			os.Exit(3)
-		}
-		ReplacementMappingSourceText = TemplateText
-	} else {
-		TemplateText = Load(*TemplateFile)
+	if *InplaceTemplatesOnly {
 		if len(*TemplateFile) == 0 {
-			var stdin = "stdin"
-			TemplateFile = &stdin
+			IOStdin = true
+			TemplateText, err = ioutil.ReadAll(os.Stdin)
+			if err != nil {
+				Elog.Printf("%v.\n", err)
+				os.Exit(3)
+			}
+			ReplacementMappingSourceText = TemplateText
+		} else {
+			TemplateText = Load(*TemplateFile)
+			if len(*TemplateFile) == 0 {
+				var stdin = "stdin"
+				TemplateFile = &stdin
+			}
 		}
-		ReplacementMappingSourceText = Load(*MappingsFile)
+	} else {
+		if len(*TemplateFile) == 0 && len(*MappingsFile) == 0 {
+			IOStdin = true
+			TemplateText, err = ioutil.ReadAll(os.Stdin)
+			if err != nil {
+				Elog.Printf("%v.\n", err)
+				os.Exit(3)
+			}
+			ReplacementMappingSourceText = TemplateText
+		} else {
+			TemplateText = Load(*TemplateFile)
+			if len(*TemplateFile) == 0 {
+				var stdin = "stdin"
+				TemplateFile = &stdin
+			}
+			ReplacementMappingSourceText = Load(*MappingsFile)
+		}
 	}
 
 	data, err := transform.Yaml2Json(ReplacementMappingSourceText)
@@ -464,9 +574,12 @@ func Preprocess(Mapping ReplacementMapping, dump bool) {
 		var T TemplateMapping
 		T.Name = key
 		T.Value = Mapping[key]
-		T.File = false
+
 		if fileMapped[key] {
 			T.File = true
+		}
+		if uriMapped[key] {
+			T.Uri = true
 		}
 		if base64Mapped[key] {
 			T.Base64 = true
