@@ -55,7 +55,7 @@ export HOSTNAME=$(shell hostname)
 pidfile=tests/pid
 .PHONY: ${pidfile} pre-test run-test post-test 
 
-pre-test: tests/pid
+pre-test: $(pidfile)
 	set | grep -i hostname
 	@echo ">SIMPLE_FILE_SERVER=$(SIMPLE_FILE_SERVER)<"
 	@echo ">SIMPLE_FILE_SERVER_HOST=$(SIMPLE_FILE_SERVER_HOST)<"
@@ -63,6 +63,7 @@ pre-test: tests/pid
 	@echo ">SIMPLE_FILE_SERVER_PORT=$(SIMPLE_FILE_SERVER_PORT)<"
 	${SIMPLE_FILE_SERVER} &	\
 	echo $$! > $<
+	until curl localhost:${SIMPLE_FILE_SERVER_PORT} &>/dev/null; do sleep 1; done
 
 post-test:
 	ps -ef|grep ${SIMPLE_FILE_SERVER}
@@ -79,3 +80,4 @@ run-test:
 	bin/k8s-template --inplace --template=tests/env.yaml
 	bin/k8s-template --mappings=tests/mappings.yaml --template=tests/env.yaml
 	bin/k8s-template --mappings=tests/empty.yaml --template=tests/env.yaml
+	bin/k8s-template --inplace < tests/env.yaml

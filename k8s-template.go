@@ -40,6 +40,7 @@ translation later
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -49,7 +50,9 @@ import (
 	"github.com/davidwalter0/transform"
 	yaml "gopkg.in/yaml.v2"
 	"io/ioutil"
+	"math"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"regexp"
 	"runtime"
@@ -108,6 +111,7 @@ type TemplateMapping struct {
 	Uri    bool   `json:"uri,omitempty"`
 }
 
+// HttpGet return text for uri
 func HttpGet(uri string) (text []byte, err error) {
 	defer RecoverWithMessage("HttpGet", false, 5)
 	var response *http.Response
@@ -141,12 +145,12 @@ func HttpGet(uri string) (text []byte, err error) {
 	return
 }
 
-// Base64EncodeString transform input to base64 encoded data
+// Base64Encode transform input string to base64 encoded data
 func Base64Encode(text string) string {
 	return base64.StdEncoding.EncodeToString([]byte(text))
 }
 
-// Base64EncodeString transform input to base64 encoded data
+// Base64Decode transform input from base64 to string
 func Base64Decode(text string) string {
 	lhs, err := base64.StdEncoding.DecodeString(text)
 	if err != nil {
@@ -191,9 +195,8 @@ func Nth(nstr string, text string) string {
 	// }
 	if len(array) > n {
 		return array[n]
-	} else {
-		return ""
 	}
+	return ""
 }
 
 // Trim spaces from a string
@@ -216,7 +219,7 @@ func Delimit(text string, delimiter string) (o string) {
 	return o
 }
 
-// zip 2 space separated lists with a separator char like "."
+// Zip 2 space separated lists with a separator char like "."
 // "a b c" "1 2 3" "." -> "a.1 a.2 a.3 b.1 b.2 b.3"
 // split list1 list2 and append with separator
 func Zip(list1, list2, separator string) string {
@@ -237,7 +240,7 @@ func Zip(list1, list2, separator string) string {
 	return text
 }
 
-// return the text of the index of search [find] from in text
+// Index return the array index of [find] from in the text
 func Index(find, in string) (text string) {
 	array := strings.Split(Trim(in), " ")
 	for i, x := range array {
@@ -249,6 +252,8 @@ func Index(find, in string) (text string) {
 	return text
 }
 
+// ZipPrefix split text on space and zip with prefix
+// "a b c" "node" "-" -> node-a node-b node-c
 func ZipPrefix(text, prefix, separator string) []string {
 	if len(separator) == 0 {
 		separator = "-"
@@ -261,18 +266,21 @@ func ZipPrefix(text, prefix, separator string) []string {
 	return array
 }
 
+// ZipSuffix split text on space and zip with suffix
+// "a b c" "node" "-" -> a-node b-node c-node
 func ZipSuffix(text, suffix, separator string) []string {
 	if len(separator) == 0 {
 		separator = "-"
 	}
 	array := Split(Trim(text))
-	text = ""
+
 	for i, x := range array {
 		array[i] = x + separator + suffix
 	}
 	return array
 }
 
+// Cat concatenate sequence of strings
 func Cat(in ...string) string {
 	text := ""
 	for _, x := range in {
@@ -281,14 +289,45 @@ func Cat(in ...string) string {
 	return text
 }
 
+// Env lookup name return value
 func Env(name string) string {
 	return os.Getenv(name)
 }
 
-func File(name string) string {
-	return string(Load(name))
+// File name loaded to byte array
+func File(name string) []byte {
+	return Load(name)
 }
 
+// ToString from byte array
+func ToString(bytes []byte) string {
+	return string(bytes)
+}
+
+// Generate an integer array from [0..n] optionally zerofilled for
+// consistent name extension use
+func Generate(n int, zerofill bool) (text []string) {
+	var i int = 0
+	suffix := " "
+	text = make([]string, 0)
+	if i >= 0 {
+		var width int = int(math.Log10(float64(n))) + 1
+		for i = 0; i < n; i++ {
+			if zerofill {
+				text = append(text, fmt.Sprintf("%0.*d%s", width, i, suffix))
+			} else {
+				text = append(text, fmt.Sprintf("%d%s", i, suffix))
+			}
+			if i == n-1 {
+				suffix = ""
+			}
+		}
+	}
+
+	return
+}
+
+// Curl pulls a value using http(s)
 func Curl(name string) string {
 	defer RecoverWithMessage("Curl", false, 4)
 	bytes, err := HttpGet(name)
@@ -297,6 +336,55 @@ func Curl(name string) string {
 		panic(fmt.Sprintf("%v", err))
 	}
 	return string(bytes)
+}
+
+// Atoi convert a string to a base 10 integer
+func Atoi(s string) int {
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		Elog.Printf("problem %v\n", err)
+	}
+	return int(n)
+}
+
+// Capitalize the first character of string
+func Capitalize(s string) string {
+	s = Trim(s)
+	if len(s) > 0 {
+		return strings.ToUpper(s[0:1]) + s[1:]
+	}
+	return s
+}
+
+// Lower downcase string
+func Lower(s string) string {
+	s = Trim(s)
+	if len(s) > 0 {
+		return strings.ToLower(s)
+	}
+	return s
+}
+
+// Upper upcase string
+func Upper(s string) string {
+	s = Trim(s)
+	if len(s) > 0 {
+		return strings.ToUpper(s)
+	}
+	return s
+}
+
+// In array returns find if present, else return an empty string
+// Calling split on a string converts to an array to preprocess the
+// string for array operations like In.
+// {{ split "a b c"|in "a" }} returns a
+func In(find string, in []string) string {
+	for _, x := range in {
+		if find == x {
+			return find
+		}
+	}
+	return ""
 }
 
 var fmap = template.FuncMap{
@@ -309,6 +397,8 @@ var fmap = template.FuncMap{
 	"zip":          Zip,
 	"zipPrefix":    ZipPrefix,
 	"zipSuffix":    ZipSuffix,
+	"zipprefix":    ZipPrefix,
+	"zipsuffix":    ZipSuffix,
 	"trim":         Trim,
 	"first":        First,
 	"index":        Index,
@@ -316,6 +406,13 @@ var fmap = template.FuncMap{
 	"curl":         Curl,
 	"env":          Env,
 	"file":         File,
+	"tostring":     ToString,
+	"generate":     Generate,
+	"atoi":         Atoi,
+	"capitalize":   Capitalize,
+	"upper":        Upper,
+	"lower":        Lower,
+	"in":           In,
 }
 
 // var debugFile *os.File = os.Stdout
@@ -465,13 +562,31 @@ func Load(filename string) []byte {
 }
 
 var IOStdin bool = false
+var Environment map[string]string = make(map[string]string, 0)
 
 func main() {
 	defer RecoverWithMessage("main", false, 3)
+	defer os.Stdout.Sync()
+	defer os.Stdout.Close()
+
+	env_array := os.Environ()
+	for _, env := range env_array {
+		parts := strings.SplitN(env, "=", 2)
+		// fmt.Println(env_array)
+		// fmt.Println(env)
+		// fmt.Println(parts)
+		// k, v := env[0], env[1]
+		k, v := string(parts[0]), string(parts[1])
+		Environment[k] = v
+		// fmt.Printf("name [%s] env[%s]\n", k, v)
+	}
+
 	var err error
 	ReplacementMappingSourceText = make([]byte, 0)
 
 	if *InplaceTemplatesOnly {
+		var set = true
+		preprocess = &set
 		if len(*TemplateFile) == 0 {
 			IOStdin = true
 			TemplateText, err = ioutil.ReadAll(os.Stdin)
@@ -486,6 +601,7 @@ func main() {
 				var stdin = "stdin"
 				TemplateFile = &stdin
 			}
+			// ReplacementMappingSourceText = TemplateText
 		}
 	} else {
 		if len(*TemplateFile) == 0 && len(*MappingsFile) == 0 {
@@ -653,6 +769,8 @@ func TemplateApplyString(mapping ReplacementMapping, text string) string { // st
 
 func TemplateApply(mapping ReplacementMapping, ttext []byte) { // string {
 	defer RecoverWithMessage("TemplateApply", false, 3)
+	w := bufio.NewWriter(os.Stdout)
+	defer w.Flush()
 	text := string(ttext)
 	for templateRegex.MatchString(text) {
 		after := TemplateApplyString(Mapping, text)
@@ -663,6 +781,7 @@ func TemplateApply(mapping ReplacementMapping, ttext []byte) { // string {
 		}
 		text = after
 	}
-	fmt.Fprintln(os.Stdout, text)
-	os.Stdout.Sync()
+
+	o := fmt.Sprintf("%s\n", text)
+	w.Write([]byte(o))
 }
